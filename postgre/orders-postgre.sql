@@ -26,7 +26,7 @@ join customer_order co on ol.order_id = co.id
 join client c on c.id = co.id 
 group by ol.order_id, co.purchase_date , c.last_name ,c.first_name ;
 
---mise à jour de la case total_price_cache(à corriger)
+--5. mise à jour de la case total_price_cache(à corriger)
 update
 	customer_order co
 set
@@ -49,15 +49,51 @@ select extract(month  from co.purchase_date) as "month", sum(co.total_price_cach
 from customer_order co 
 group by "month";
 
+--6. Récupérer la liste des 10 clients qui ont effectué le plus grand montant 
+--de commandes, et obtenir ce montant total pour chaque client.
 
-
-select extract(month from co.purchase_date)  
+select co.client_id, sum(co.total_price_cache) as total_per_client
 from customer_order co 
+group by co.client_id 
+order by co.client_id asc
+limit 10;
 
+--7. Récupérer le montant total des commandes pour chaque jour.
+select extract(day  from co.purchase_date) as "day", sum(co.total_price_cache) as total_per_client
+from customer_order co 
+group by "day"
+order by "day" asc ;
 
+--8. Ajouter une colonne intitulée “category” à la table contenant les commandes. 
+--Cette colonne contiendra une valeur numérique (il faudra utiliser « ALTER TABLE », 
+--https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-add-column/)
+alter table customer_order 
+add column category INT default 0;
 
+--9. Enregistrer la valeur de la catégorie, en suivant les règles suivantes :
+--“1” pour les commandes de moins de 200€
+--“2” pour les commandes entre 200€ et 500€
+--“3” pour les commandes entre 500€ et 1.000€
+--“4” pour les commandes supérieures à 1.000€
 
+update 
+customer_order 
+set
+category = case  
+when  total_price_cache<200 then 1
+when  total_price_cache<500 then 2
+when  total_price_cache<1000 then 3
+when  total_price_cache>1000 then 4
+end
+; 
 
-
-
-
+--cas avec le total par commande et client
+with totals as (select o.order_id, sum(o.total_price) as order_sum
+from order_line o
+group by o.order_id)
+update customer_order co
+set category = case
+when totals.order_sum <200 then 1
+end 
+from totals
+where co.id = totals.order_id
